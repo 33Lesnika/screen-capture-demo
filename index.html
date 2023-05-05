@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Screen recorder demo</title>
+</head>
+<body>
+<div>
+    <button type="button" onclick="startRecording()">Start recording</button>
+    <button type="button" onclick="stopRecording()">Stop recording</button>
+</div>
+<video id="videoplayer" width="854" height="480" hidden controls></video>
+<script lang="javascript">
+    let recorder;
+
+    function startRecording() {
+        let videoplayer = document.getElementById("videoplayer");
+        videoplayer.hidden = true;
+        videoplayer.pause();
+        videoplayer.currentTime = 0;
+        recordScreen()
+            .then(stream => {
+                recorder = createAndStartRecorder(stream);
+            });
+    }
+
+    async function stopRecording() {
+        recorder?.stop();
+    }
+
+    async function recordScreen() {
+        return await navigator.mediaDevices.getDisplayMedia({
+            audio: true,
+            video: {
+                mediaSource: "screen",
+                displaySurface: "monitor"
+            }
+        });
+    }
+
+    function createAndStartRecorder(stream, mimeType) {
+        // the stream data is stored in this array
+        let recordedChunks = [];
+        stream.getVideoTracks().forEach(track => track.applyConstraints({frameRate: 15.0}))
+        const mediaRecorder = new MediaRecorder(stream, {
+            mimeType: "video/webm; codecs=vp9",
+            videoBitsPerSecond: 1_000_000
+        });
+
+        mediaRecorder.ondataavailable = function (e) {
+            if (e.data.size > 0) {
+                recordedChunks.push(e.data);
+            }
+        };
+        mediaRecorder.onstop = function () {
+            saveFile(recordedChunks);
+            recordedChunks = [];
+            mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+        };
+        mediaRecorder.start(200); // For every 200ms the stream data will be stored in a separate chunk.
+        return mediaRecorder;
+    }
+
+
+    function saveFile(recordedChunks) {
+
+        const blob = new Blob(recordedChunks, {
+            type: 'video/webm'
+        });
+        let filename = window.prompt('Enter file name'),
+            downloadLink = document.createElement('a');
+        downloadLink.href = URL.createObjectURL(blob);
+        downloadLink.download = `${filename}.webm`;
+
+        let videoplayer = document.getElementById("videoplayer")
+        videoplayer.src = downloadLink.href;
+        videoplayer.hidden = false;
+
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        URL.revokeObjectURL(blob); // clear from memory
+        document.body.removeChild(downloadLink);
+    }
+</script>
+</body>
+</html>
