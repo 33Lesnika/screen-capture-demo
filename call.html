@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Call</title>
+    <script src="https://jssip.net/download/releases/jssip-3.10.0.js"></script>
+</head>
+<body>
+<audio id="audio-element"></audio>
+<script>
+    const audioElem = document.getElementById("audio-element");
+    let ua;
+    JsSIP.debug.enable('JsSIP:*');
+    function register() {
+        ua?.stop();
+        const socket = new JsSIP.WebSocketInterface('wss://172.31.54.211:7443');
+        const configuration = {
+            sockets: [socket],
+            uri: 'sip:1001@172.31.54.211',
+            password: '1234',
+            session_timers: false
+        };
+
+        ua = new JsSIP.UA(configuration);
+
+        ua.start();
+        ua.on("newRTCSession", function (data) {
+            let session = data.session;
+
+            if (session.direction === "incoming") {
+                // incoming call here
+                session.on("accepted", function () {
+                    // the call has answered
+                });
+                session.on("confirmed", function () {
+                    // this handler will be called for incoming calls too
+                });
+                session.on("ended", function () {
+                    // the call has ended
+                });
+                session.on("failed", function () {
+                    // unable to establish the call
+                });
+                session.on('addstream', function (e) {
+                    // set remote audio stream (to listen to remote audio)
+                    // remoteAudio is <audio> element on page
+                    audioElem.src = window.URL.createObjectURL(e.stream);
+                    audioElem.play();
+                });
+
+                // Answer call
+                session.answer(options);
+
+                // Reject call (or hang up it)
+                // session.terminate();
+            }
+        });
+    }
+
+    const options = {
+        'eventHandlers': {
+            'progress': function (e) {
+                console.log('call is in progress');
+            },
+            'failed': function (e) {
+                console.log('call failed with cause: ');
+                console.log(e);
+            },
+            'ended': function (e) {
+                console.log('call ended with cause: ');
+                console.log(e);
+            },
+            'confirmed': function (e) {
+                console.log('call confirmed');
+            }
+        },
+        'mediaConstraints': {'audio': true, 'video': false}
+    };
+
+    function call() {
+        // Register callbacks to desired call events
+
+        const session = ua.call('sip:5000@172.31.54.211', options);
+
+        session.connection.addEventListener('addstream', event => {
+            console.log(event);
+            audioElem.srcObject = event.stream;
+            audioElem.play();
+        });
+    }
+</script>
+<div>
+    <button onclick="register()">Register</button>
+    <button onclick="call()">Call</button>
+</div>
+</body>
+</html>
